@@ -139,3 +139,113 @@ Spark + Hive integration specific details are listed below:
       Below are the system tables for Hive metastore under database `metadata_db` in PostgreSQL database:
       
       ![image](https://github.com/krohit-bkk/Lineman-ETL/assets/137164694/84e69d71-80a5-4bca-93f7-f59bc4dbc9c5)
+
+### Sample console output from Spark applications
+   * Console logs from `Ingestion` job. This application is defined in `com.lineman.main.Ingestion` class.
+
+      ```bash
+      spark-submit --jars /root/postgresql-42.5.1.jar --class com.lineman.main.Ingestion /root/SparkScalaMaven-1.0-SNAPSHOT.jar >> /root/logs/$(date +"%Y%m%d%H%M%S")_ingestion.log 2>&1
+      ```
+      
+      Code:   
+
+      ```scala
+      val orderDf = PostgresUtils.readPostgresTable("order_detail")
+        .withColumn(
+          "discount",
+          round(col("discount"), 2)
+        ).withColumn(
+          "dt",
+          date_format(col("order_created_timestamp"), "yyyyMMdd")
+        )
+      
+      val restaurantDf = PostgresUtils.readPostgresTable("restaurant_detail")
+        .withColumn(
+          "latitude",
+          round(col("latitude"), 8)
+        ).withColumn(
+        "longitude",
+        round(col("longitude"), 8)
+      ).withColumn("dt", lit("latest"))
+      
+      orderDf.show(20, false)
+      restaurantDf.show(20, false)
+      
+      HiveUtils.writeToHive(orderDf, "lineman", "order_detail", Array("dt"), "overwrite")
+      HiveUtils.writeToHive(restaurantDf, "lineman", "restaurant_detail", Array("dt"), "overwrite")
+      
+      val df1 = HiveUtils.readFromHive("lineman", "order_detail").withColumn("Source", lit("Hive"))
+      val df2 = HiveUtils.readFromHive("lineman", "restaurant_detail").withColumn("Source", lit("Hive"))
+      df1.show(20, false)
+      df2.show(20, false)
+      ```
+      
+      ![image](https://github.com/krohit-bkk/Lineman-ETL/assets/137164694/1132418c-6b7a-4a37-9390-c4b498d54722)
+
+   * Console logs from `Transformation` job. This application is defined in `com.lineman.main.Transformation` class.
+     ```bash
+     spark-submit --jars /root/postgresql-42.5.1.jar --class com.lineman.main.Transformation /root/SparkScalaMaven-1.0-SNAPSHOT.jar >> /root/logs/$(date +"%Y%m%d%H%M%S")_transformation.log 2>&1
+     ```
+
+     Code:
+
+     ```scala
+     // Read the source table
+     val _orderDetailDf = HiveUtils.readFromHive("lineman", "order_detail")
+     val _restaurantDetailDf = HiveUtils.readFromHive("lineman", "restaurant_detail")
+     
+     // Transformations - Enrich restaurant_detail
+     val restaurantDetailDf = _restaurantDetailDf.withColumn(
+       "cooking_bin",
+       when(
+         col("estimated_cooking_time").between(10, 40), lit(1)
+       ).when(
+         col("estimated_cooking_time").between(41, 80), lit(2)
+       ).when(
+         col("estimated_cooking_time").between(81, 120), lit(3)
+       ).otherwise(
+         lit(4)
+       )
+     )
+     
+     // Transformations - Enrich order_detail
+     val orderDetailDf = _orderDetailDf.withColumn(
+       "discount_no_null",
+       coalesce(col("discount"), lit(0))
+     )
+     
+     // Write the processed __restaurant_detail_new__ and __order_detail_new__
+     HiveUtils.writeToHive(restaurantDetailDf, "lineman", "__restaurant_detail_new__", Array("dt"), "append")
+     HiveUtils.writeToHive(orderDetailDf, "lineman", "__order_detail_new__", Array("dt"), "append")
+     
+     // Further analysis
+     val joinedDF = restaurantDetailDf.join(
+       orderDetailDf,
+       restaurantDetailDf("id") === orderDetailDf("restaurant_id"),
+       "left"
+     ).drop(
+       "id"
+     ) 
+    
+     // Get avg discount for each category
+     val avgDiscountPerCategory = joinedDF
+       .groupBy(col("category"))
+       .agg(
+         avg("discount").alias("avg_discount")
+       ).withColumn(
+       "avg_discount",
+       round(col("avg_discount"), 2)
+     )
+    
+     // Row count per each cooking_bin
+     val rowCntPerCookingBin = joinedDF
+       .groupBy("cooking_bin")
+       .agg(
+         count("*").alias("row_count")
+       )
+    
+     // NOTE: Check results - comment out in production
+     avgDiscountPerCategory.show(10, false)
+     rowCntPerCookingBin.show(10, false)
+     ```
+     ![image](https://github.com/krohit-bkk/Lineman-ETL/assets/137164694/af7c60b0-00f2-45f8-b12a-13c6e9217ca8)
