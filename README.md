@@ -64,7 +64,7 @@ Clone this repository in your working directory (e.g. `~/docker-project/`) and f
 
    `crontab` is essential from automation point of view. We are scheduling to run `spark-submit` in a script `automate_with_cron.sh` scheduled on `crontab` to run every 1 minute.
 
-### Spark-Hive Spercifications
+### Spark-Hive Specifications
 The `docker compose` command would create three containers, namely - `hive2`, `hive-metastore` and `postgres-metastore`. More important points are listed below:
    * `hive2` is the container where we have `beeline`, `spark`.
    * `hive-metastore` is, as the name suggests, the Hive metastore. It needs PostgreSQL database to store data.
