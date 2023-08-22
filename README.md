@@ -111,7 +111,7 @@ Spark + Hive integration specific details are listed below:
 
     ![image](https://github.com/krohit-bkk/Lineman-ETL/assets/137164694/57108b43-6e86-4664-ae15-278c078e7846)
 
-    Check the counts of tables as requested in the problem statement:
+  * Check the counts of tables as requested in the problem statement:
     ```sql
     SELECT COUNT(*) FROM `__order_detail_new__` UNION ALL
     SELECT COUNT(*) FROM `__restaurant_detail_new__` UNION ALL
