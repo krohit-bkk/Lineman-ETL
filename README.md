@@ -71,13 +71,13 @@ The `docker compose` command would create three containers, namely - `hive2`, `h
    * `postgres-metastore` is the PostgreSQL database container and it has two notable databases:
      * `metastore_db` - to manage tables/relations for managing Hive metastore
      * `lineman` - where we have data tables for this project (`lineman.order_detail` and `lineman.restaurant_detail`)
+   * Natually, `hive-metastore` container has a dependency on `postgres-metastore` container. This container is instantiation completes only after `postgres-metastore` is up. While booting up, this keeps polling for Postgres service to be up (see `docker-compose.yml` file).
    * In case any of the container dies due to any issue, you can restart the container using `docker start <container-name>`.
    * To debug further on any container, you can use command - `docker logs <container-name>`.
    * To shutdown the containers, run `docker compose down` command.
 
      ![image](https://github.com/krohit-bkk/Lineman-ETL/assets/137164694/6888e759-9dfe-41a9-8376-d5d54eda9299)
 
-   * Natually, `hive-metastore` container has a dependency on `postgres-metastore` container. This container is instantiation completes only after `postgres-metastore` is up. While booting up, this keeps polling for Postgres service to be up (dicsussed later).
 
 Spark + Hive integration specific details are listed below:
   * To login to hive container, use the command below:
