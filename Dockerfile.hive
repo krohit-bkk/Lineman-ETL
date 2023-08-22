@@ -1,0 +1,38 @@
+# Extend the official Hive image
+FROM apachehive/hive:4.0.0-beta-1-SNAPSHOT
+
+USER root
+
+# RUN mkdir -p /root/tools 
+# RUN cd /root/tools/
+
+RUN mkdir -p /opt/hive/tools/ && cd /opt/hive/tools/
+
+WORKDIR /opt/hive/tools/
+RUN echo "alias ll='ls -l'" >> ~/.bashrc 
+
+RUN apt-get update && apt-get install -y wget vim cron 
+RUN service cron start
+RUN echo '* * * * * bash /root/automate_with_cron.sh' | crontab -
+
+COPY ./wait_for_it.sh /
+# wait_for_it.sh postgres-metastore:5432 60 echo 'Service is up!'"
+# delay because sometimes postgres-metastore container takes a while to come up
+RUN echo "" >> /entrypoint.sh
+RUN echo '/wait_for_it.sh localhost:5432 60 echo "Service is up!"' >> /entrypoint.sh
+ 
+RUN wget https://dlcdn.apache.org/spark/spark-3.4.1/spark-3.4.1-bin-hadoop3.tgz
+RUN tar xzf spark-3.4.1-bin-hadoop3.tgz
+RUN ln -s spark-3.4.1-bin-hadoop3 spark
+RUN touch ~/.bashrc
+RUN echo "export SPARK_HOME=/opt/hive/tools/spark/" >> ~/.bashrc
+RUN echo "export PATH=/opt/hive/tools/spark/bin:$PATH" >> ~/.bashrc
+RUN rm spark-3.4.1-bin-hadoop3.tgz
+
+RUN sed -i "/<\/configuration>/i   <property>\n    <name>hive.metastore.uris</name>\n    <value>thrift://hive-metastore:9083</value>\n  </property>" "/opt/hive/conf/hive-site.xml"
+RUN ln -s /opt/hive/conf/hive-site.xml /opt/hive/tools/spark/conf/hive-site.xml
+
+# Set up Spark environment
+ENV SPARK_HOME=/opt/hive/tools/spark/
+ENV PATH=$SPARK_HOME/bin:$PATH
+
